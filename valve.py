@@ -19,8 +19,10 @@ import util
 from acl import ACL
 from dp import DP
 from port import Port
+from api import RestAPI
 
 from ryu.base import app_manager
+from ryu.app.wsgi import WSGIApplication
 from ryu.controller import ofp_event
 from ryu.controller import dpset
 from ryu.controller.handler import MAIN_DISPATCHER
@@ -46,7 +48,10 @@ STATS_INTERVAL = 30
 class Valve(app_manager.RyuApp):
     OFP_VERSIONS = [ofproto_v1_3.OFP_VERSION]
 
-    _CONTEXTS = {'dpset': dpset.DPSet}
+    _CONTEXTS = {
+        'dpset': dpset.DPSet,
+        'wsgi': WSGIApplication
+        }
 
     def __init__(self, *args, **kwargs):
         super(Valve, self).__init__(*args, **kwargs)
@@ -68,6 +73,10 @@ class Valve(app_manager.RyuApp):
 
         # Create dpset object for querying Ryu's DPSet application
         self.dpset = kwargs['dpset']
+
+        # Let's get RESTful up in here
+        self.wsgi = kwargs['wsgi']
+        self.wsgi.register(RestAPI, {'valve': self})
 
         # Initialise datastructures to store state
         self.mac_to_port = {}
