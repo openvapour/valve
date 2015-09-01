@@ -346,7 +346,7 @@ class Valve(app_manager.RyuApp):
         # install broadcast/multicast rules onto datapath
         if datapath.config_default['smart_broadcast']:
             for match in matches:
-                priority = datapath.config_default['low_priority']
+                priority = datapath.config_default['high_priority']
                 cookie = datapath.config_default['cookie']
                 self.add_flow(dp, match, action, priority, cookie)
 
