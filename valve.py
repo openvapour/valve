@@ -107,6 +107,7 @@ class Valve(app_manager.RyuApp):
             # Set defaults
             self.conf.setdefault('default', {})
             defaults = self.conf['default']
+            defaults.setdefault('learning', True)      # Shall we learn MACs?
             defaults.setdefault('table_miss', True)    # Shall we install a table-miss rule?
             defaults.setdefault('smart_broadcast', True) # Shall we install a broadcast/multicast rules?
             defaults.setdefault('lowest_priority', 0)  # Table-miss priority
