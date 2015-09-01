@@ -437,23 +437,28 @@ class Valve(app_manager.RyuApp):
         for vid, v in datapath.vlans.items():
             self.logger.info("Configuring %s", v)
 
-            controller_act = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+            if datapath.config_default['learning']:
+                controller_act = [parser.OFPActionOutput(ofproto.OFPP_CONTROLLER)]
+            else:
+                controller_act = []
 
             # generate the output actions for each port
             tagged_act = self.tagged_output_action(parser, v.tagged)
             untagged_act = self.untagged_output_action(parser, v.untagged)
 
             # send rule for matching packets arriving on tagged ports
-            strip_act = [parser.OFPActionPopVlan()]
-            action = copy.copy(controller_act)
-            if tagged_act:
-                action += tagged_act
-            if untagged_act:
-                action += strip_act + untagged_act
-            match = parser.OFPMatch(vlan_vid=v.vid|ofproto_v1_3.OFPVID_PRESENT)
-            priority = datapath.config_default['low_priority']
-            cookie = datapath.config_default['cookie']
-            self.add_flow(dp, match, action, priority, cookie)
+            for port in v.tagged:
+                strip_act = [parser.OFPActionPopVlan()]
+                action = copy.copy(controller_act)
+                if tagged_act:
+                    action += tagged_act
+                if untagged_act:
+                    action += strip_act + untagged_act
+                match = parser.OFPMatch(in_port=port.number,
+                        vlan_vid=v.vid|ofproto_v1_3.OFPVID_PRESENT)
+                priority = datapath.config_default['low_priority']
+                cookie = datapath.config_default['cookie']
+                self.add_flow(dp, match, action, priority, cookie)
 
             # send rule for each untagged port
             push_act = [
