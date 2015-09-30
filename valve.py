@@ -328,7 +328,7 @@ class Valve(app_manager.RyuApp):
         matches = []
         if datapath.ports[in_port].is_tagged():
             # send rule for mathcing packets arriving on tagged ports
-            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_tagged'])]
+            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_tagged_fastpath'])]
 
             matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
                     in_port=in_port, eth_src=src, eth_dst='ff:ff:ff:ff:ff:ff'))
@@ -340,7 +340,7 @@ class Valve(app_manager.RyuApp):
                              '01:00:00:00:00:00')))
         elif datapath.ports[in_port].is_untagged():
             # send rule for each untagged port
-            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_untagged'])]
+            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_untagged_fastpath'])]
 
             matches.append(parser.OFPMatch(in_port=in_port, eth_src=src,
                     eth_dst='ff:ff:ff:ff:ff:ff'))
@@ -441,7 +441,7 @@ class Valve(app_manager.RyuApp):
             cookie = datapath.config_default['cookie']
             self.add_flow(dp, match_all, drop_act, priority, cookie)
 
-        group_counter = 0
+        group_counter = 1
 
         for vid, v in datapath.vlans.items():
             self.logger.info("Configuring %s", v)
@@ -459,13 +459,19 @@ class Valve(app_manager.RyuApp):
             to_untagged   = self.output_buckets(parser, v, xlate=True)
 
             # generate groups
-            flood_from_tagged   = to_controller + from_tagged + to_untagged
+            flood_from_tagged  = to_controller + from_tagged + to_untagged
             flood_from_untagged = to_controller + from_untagged + to_tagged
-            v.group['from_tagged']   = group_counter + 1
-            v.group['from_untagged'] = group_counter + 2
-            group_counter = group_counter + 1
+            fastpath_from_tagged = from_tagged + to_untagged
+            fastpath_from_untagged = from_untagged + to_tagged
+            v.group['from_tagged'] = group_counter
+            v.group['from_untagged'] = group_counter + 1
+            v.group['from_tagged_fastpath'] = group_counter + 2
+            v.group['from_untagged_fastpath'] = group_counter + 3
+            group_counter = group_counter + 4
             self.add_group(dp, v.group['from_tagged'], flood_from_tagged)
             self.add_group(dp, v.group['from_untagged'], flood_from_untagged)
+            self.add_group(dp, v.group['from_tagged_fastpath'], fastpath_from_tagged)
+            self.add_group(dp, v.group['from_untagged_fastpath'], fastpath_from_untagged)
 
             # send rule for matching packets arriving on tagged ports
             for port in v.tagged:
