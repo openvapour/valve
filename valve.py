@@ -201,17 +201,38 @@ class Valve(app_manager.RyuApp):
             command=ofproto.OFPFC_ADD, match=match, instructions=inst)
         datapath.send_msg(mod)
 
-    def tagged_output_action(self, parser, tagged_ports):
-        act = []
-        for port in tagged_ports:
-            act.append(parser.OFPActionOutput(port.number))
-        return act
+    def add_group(self, datapath, group_id, buckets):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
 
-    def untagged_output_action(self, parser, untagged_ports):
-        act = []
-        for port in untagged_ports:
+        mod = parser.OFPGroupMod(
+            datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_ALL,
+            group_id, buckets)
+        print mod
+        datapath.send_msg(mod)
+
+    def output_buckets(self, parser, vlan, tagged=False, xlate=False):
+        push_act = [
+            parser.OFPActionPushVlan(ether.ETH_TYPE_8021Q),
+            parser.OFPActionSetField(vlan_vid=vlan.vid|ofproto_v1_3.OFPVID_PRESENT)
+        ]
+        strip_act = [parser.OFPActionPopVlan()]
+        buckets = []
+
+        if tagged:
+            ports = vlan.tagged
+            xlate_act = push_act
+        else:
+            ports = vlan.untagged
+            xlate_act = strip_act
+
+        for port in ports:
+            act = []
+            if xlate == True:
+                act = act + xlate_act
             act.append(parser.OFPActionOutput(port.number))
-        return act
+            buckets.append(parser.OFPBucket(actions=act))
+        return buckets
 
     def send_port_stats_request(self, dp):
         ofp = dp.ofproto
@@ -304,18 +325,10 @@ class Valve(app_manager.RyuApp):
         self.mac_to_port[dp.id][vid][src] = in_port
 
         # generate the output actions for broadcast traffic
-        tagged_act = self.tagged_output_action(parser, datapath.vlans[vid].tagged)
-        untagged_act = self.untagged_output_action(parser, datapath.vlans[vid].untagged)
-
         matches = []
-        action = []
         if datapath.ports[in_port].is_tagged():
             # send rule for mathcing packets arriving on tagged ports
-            strip_act = [parser.OFPActionPopVlan()]
-            if tagged_act:
-                action += tagged_act
-            if untagged_act:
-                action += strip_act + untagged_act
+            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_tagged'])]
 
             matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
                     in_port=in_port, eth_src=src, eth_dst='ff:ff:ff:ff:ff:ff'))
@@ -327,14 +340,7 @@ class Valve(app_manager.RyuApp):
                              '01:00:00:00:00:00')))
         elif datapath.ports[in_port].is_untagged():
             # send rule for each untagged port
-            push_act = [
-              parser.OFPActionPushVlan(ether.ETH_TYPE_8021Q),
-              parser.OFPActionSetField(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT)
-              ]
-            if untagged_act:
-                action += untagged_act
-            if tagged_act:
-                action += push_act + tagged_act
+            action = [parser.OFPActionGroup(datapath.vlans[vid].group['from_untagged'])]
 
             matches.append(parser.OFPMatch(in_port=in_port, eth_src=src,
                     eth_dst='ff:ff:ff:ff:ff:ff'))
@@ -435,6 +441,8 @@ class Valve(app_manager.RyuApp):
             cookie = datapath.config_default['cookie']
             self.add_flow(dp, match_all, drop_act, priority, cookie)
 
+        group_counter = 0
+
         for vid, v in datapath.vlans.items():
             self.logger.info("Configuring %s", v)
 
@@ -443,18 +451,25 @@ class Valve(app_manager.RyuApp):
             else:
                 controller_act = []
 
-            # generate the output actions for each port
-            tagged_act = self.tagged_output_action(parser, v.tagged)
-            untagged_act = self.untagged_output_action(parser, v.untagged)
+            # generate the output buckets for each port combination
+            to_controller = [parser.OFPBucket(actions=controller_act)]
+            from_tagged   = self.output_buckets(parser, v, tagged=True)
+            to_tagged     = self.output_buckets(parser, v, tagged=True, xlate=True)
+            from_untagged = self.output_buckets(parser, v)
+            to_untagged   = self.output_buckets(parser, v, xlate=True)
+
+            # generate groups
+            flood_from_tagged   = to_controller + from_tagged + to_untagged
+            flood_from_untagged = to_controller + from_untagged + to_tagged
+            v.group['from_tagged']   = group_counter + 1
+            v.group['from_untagged'] = group_counter + 2
+            group_counter = group_counter + 1
+            self.add_group(dp, v.group['from_tagged'], flood_from_tagged)
+            self.add_group(dp, v.group['from_untagged'], flood_from_untagged)
 
             # send rule for matching packets arriving on tagged ports
             for port in v.tagged:
-                strip_act = [parser.OFPActionPopVlan()]
-                action = copy.copy(controller_act)
-                if tagged_act:
-                    action += tagged_act
-                if untagged_act:
-                    action += strip_act + untagged_act
+                action = [parser.OFPActionGroup(v.group['from_tagged'])]
                 match = parser.OFPMatch(in_port=port.number,
                         vlan_vid=v.vid|ofproto_v1_3.OFPVID_PRESENT)
                 priority = datapath.config_default['low_priority']
@@ -462,18 +477,9 @@ class Valve(app_manager.RyuApp):
                 self.add_flow(dp, match, action, priority, cookie)
 
             # send rule for each untagged port
-            push_act = [
-              parser.OFPActionPushVlan(ether.ETH_TYPE_8021Q),
-              parser.OFPActionSetField(vlan_vid=v.vid|ofproto_v1_3.OFPVID_PRESENT)
-              ]
-
             for port in v.untagged:
+                action = [parser.OFPActionGroup(v.group['from_untagged'])]
                 match = parser.OFPMatch(in_port=port.number)
-                action = copy.copy(controller_act)
-                if untagged_act:
-                    action += untagged_act
-                if tagged_act:
-                    action += push_act + tagged_act
                 priority = datapath.config_default['low_priority']
                 cookie = datapath.config_default['cookie']
                 self.add_flow(dp, match, action, priority, cookie)

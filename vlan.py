@@ -23,6 +23,7 @@ class VLAN:
         self.vid = vid
         self.tagged = []
         self.untagged = []
+        self.group = {}
 
         for port in ports:
             self.add_port(port)
