@@ -208,7 +208,6 @@ class Valve(app_manager.RyuApp):
         mod = parser.OFPGroupMod(
             datapath, ofproto.OFPGC_ADD, ofproto.OFPGT_ALL,
             group_id, buckets)
-        print mod
         datapath.send_msg(mod)
 
     def output_buckets(self, parser, vlan, tagged=False, xlate=False):
