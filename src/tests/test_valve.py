@@ -22,13 +22,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(testdir, srcdir)))
 
 from ryu.ofproto import ether
 from ryu.ofproto import ofproto_v1_3 as ofp
-from valve import OVSStatelessValve
-from dp import DP
+from ryu_faucet.valve import OVSStatelessValve
+from ryu_faucet.dp import DP
 from fakeoftable import FakeOFTable
 
 class ValveTestCase(unittest.TestCase):
     def setUp(self):
-        dp = DP.parser("tests/config/valve-test.yaml")
+        dp = DP.parser("config/valve-test.yaml")
         self.valve = OVSStatelessValve(dp)
         self.table = FakeOFTable()
         self.table.apply_ofmsgs(self.valve.datapath_connect(1, [1,2,3,4,5,6]))
@@ -333,7 +333,7 @@ class ValveTestCase(unittest.TestCase):
         match = {
             'in_port': 3,
             'vlan_vid': 11|ofp.OFPVID_PRESENT}
-        new_dp = DP.parser("tests/config/valve-test-reload.yaml")
+        new_dp = DP.parser("config/valve-test-reload.yaml")
         ofmsgs = self.valve.reload_config(new_dp)
         self.table.apply_ofmsgs(ofmsgs)
         self.assertFalse(
@@ -359,7 +359,7 @@ class ValveTestCase(unittest.TestCase):
             {'in_port': 2, 'vlan_vid': 10|ofp.OFPVID_PRESENT},
             {'in_port': 1, 'eth_src': "00:00:00:00:00:03"},
             {'in_port': 1}]
-        dp = DP.parser("tests/config/valve-test-reload.yaml")
+        dp = DP.parser("config/valve-test-reload.yaml")
         ofmsgs = self.valve.reload_config(dp)
         self.table.apply_ofmsgs(ofmsgs)
         for match in matches:
@@ -407,7 +407,7 @@ class ValveTestCase(unittest.TestCase):
             eth_src="00:00:00:00:00:05",
             eth_dst="00:00:00:00:00:06")
         self.table.apply_ofmsgs(rcv_packet_ofmsgs)
-        dp = DP.parser("tests/config/valve-test-reload.yaml")
+        dp = DP.parser("config/valve-test-reload.yaml")
         ofmsgs = self.valve.reload_config(dp)
         self.table.apply_ofmsgs(ofmsgs)
         for match in matches:
