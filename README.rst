@@ -1,5 +1,5 @@
 :version: 0.25a
-:copyright: 2015 `REANNZ <http://www.reannz.co.nz/>`_.  All Rights Reserved.
+:copyright: 2015 `Research and Education Advanced Network New Zealand Ltd. <http://www.reannz.co.nz/>`_
 
 .. meta::
    :keywords: Openflow, Ryu, Faucet, VLAN, SDN
@@ -119,3 +119,9 @@ Gauge is run with ``ryu-manager``:
 Support
 =======
 Mailing list info goes here
+
+======
+License
+======
+Faucet is licensed under the Apache 2.0 license. For more information, please
+see `LICENSE <https://github.com/REANNZ/faucet/blob/packaging/LICENSE>`_ file
