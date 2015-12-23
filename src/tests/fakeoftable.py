@@ -242,6 +242,6 @@ class FakeOFTable():
                                     reverse=True):
                 if flowmod.table_id != table:
                     continue
-                string += flowmod
+                string += str(flowmod)
                 string += "\n"
         return string
