@@ -191,6 +191,15 @@ class Valve(app_manager.RyuApp):
             out_group=ofproto.OFPG_ANY, match=match, instructions=[])
         datapath.send_msg(mod)
 
+    def clear_groups(self, datapath):
+        ofproto = datapath.ofproto
+        parser = datapath.ofproto_parser
+        match = parser.OFPMatch()
+        mod = parser.OFPGroupMod(
+            datapath=datapath, command=ofproto.OFPGC_DELETE,
+            type_=ofproto.OFPGT_ALL, group_id=ofproto.OFPG_ALL)
+        datapath.send_msg(mod)
+
     def add_flow(self, datapath, match, actions, priority, cookie):
         ofproto = datapath.ofproto
         parser = datapath.ofproto_parser
@@ -431,6 +440,9 @@ class Valve(app_manager.RyuApp):
 
         # clear flow table on datapath
         self.clear_flows(dp, datapath.config_default['cookie'])
+
+        # clear groups
+        self.clear_groups(dp)
 
         # add catchall drop rule to datapath
         drop_act = []
