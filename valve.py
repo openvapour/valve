@@ -325,6 +325,18 @@ class Valve(app_manager.RyuApp):
                     eth_src=src,
                     eth_dst=('01:00:00:00:00:00',
                              '01:00:00:00:00:00')))
+
+            matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
+                    in_port=in_port,
+                    eth_src=src,
+                    eth_dst=('01:00:5E:00:00:00',
+                             'ff:ff:ff:00:00:00')))
+
+            matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
+                    in_port=in_port,
+                    eth_src=src,
+                    eth_dst=('33:33:00:00:00:00',
+                             'ff:ff:00:00:00:00')))
         elif datapath.ports[in_port].is_untagged():
             # send rule for each untagged port
             push_act = [
@@ -344,10 +356,20 @@ class Valve(app_manager.RyuApp):
                     eth_dst=('01:00:00:00:00:00',
                              '01:00:00:00:00:00')))
 
+            matches.append(parser.OFPMatch(in_port=in_port,
+                    eth_src=src,
+                    eth_dst=('01:00:5E:00:00:00',
+                             'ff:ff:ff:00:00:00')))
+
+            matches.append(parser.OFPMatch(in_port=in_port,
+                    eth_src=src,
+                    eth_dst=('33:33:00:00:00:00',
+                             'ff:ff:00:00:00:00')))
+
         # install broadcast/multicast rules onto datapath
         if datapath.config_default['smart_broadcast']:
             for match in matches:
-                priority = datapath.config_default['high_priority']
+                priority = datapath.config_default['high_priority'] + 10
                 cookie = datapath.config_default['cookie']
                 self.add_flow(dp, match, action, priority, cookie)
 
