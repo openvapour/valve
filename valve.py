@@ -488,7 +488,7 @@ class Valve(app_manager.RyuApp):
             to_controller = [parser.OFPBucket(actions=controller_act)]
             from_tagged   = self.output_buckets(parser, v, tagged=True)
             to_tagged     = self.output_buckets(parser, v, tagged=True, xlate=True)
-            from_untagged = self.output_buckets(parser, v)
+            from_untagged = self.output_buckets(parser, v, xlate=True)
             to_untagged   = self.output_buckets(parser, v, xlate=True)
 
             # generate groups
