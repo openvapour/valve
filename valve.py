@@ -110,6 +110,8 @@ class Valve(app_manager.RyuApp):
             defaults.setdefault('learning', True)      # Shall we learn MACs?
             defaults.setdefault('table_miss', True)    # Shall we install a table-miss rule?
             defaults.setdefault('smart_broadcast', True) # Shall we install a broadcast/multicast rules?
+            defaults.setdefault('translate_untagged', False) # Workaround for datapaths that need us to
+                                                             # explicitly pop_vlan for untagged traffic
             defaults.setdefault('lowest_priority', 0)  # Table-miss priority
             defaults.setdefault('priority_offset', 0)  # How much to offset default priority by
             defaults.setdefault('low_priority', defaults['priority_offset'] + 9000)
@@ -488,8 +490,11 @@ class Valve(app_manager.RyuApp):
             to_controller = [parser.OFPBucket(actions=controller_act)]
             from_tagged   = self.output_buckets(parser, v, tagged=True)
             to_tagged     = self.output_buckets(parser, v, tagged=True, xlate=True)
-            from_untagged = self.output_buckets(parser, v, xlate=True)
             to_untagged   = self.output_buckets(parser, v, xlate=True)
+            if datapath.config_default['translate_untagged']:
+                from_untagged = self.output_buckets(parser, v, xlate=True)
+            else:
+                from_untagged = self.output_buckets(parser, v)
 
             # generate groups
             flood_from_tagged  = to_controller + from_tagged + to_untagged
