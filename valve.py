@@ -310,33 +310,19 @@ class Valve(app_manager.RyuApp):
         matches = []
         action = []
         if datapath.ports[in_port].is_tagged():
-            # send rule for mathcing packets arriving on tagged ports
+            # send rule for matching packets arriving on tagged ports
             strip_act = [parser.OFPActionPopVlan()]
             if tagged_act:
                 action += tagged_act
             if untagged_act:
                 action += strip_act + untagged_act
 
-            matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
-                    in_port=in_port, eth_src=src, eth_dst='ff:ff:ff:ff:ff:ff'))
-
+            # match multicast/broadcast
             matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
                     in_port=in_port,
                     eth_src=src,
                     eth_dst=('01:00:00:00:00:00',
                              '01:00:00:00:00:00')))
-
-            matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
-                    in_port=in_port,
-                    eth_src=src,
-                    eth_dst=('01:00:5E:00:00:00',
-                             'ff:ff:ff:00:00:00')))
-
-            matches.append(parser.OFPMatch(vlan_vid=vid|ofproto_v1_3.OFPVID_PRESENT,
-                    in_port=in_port,
-                    eth_src=src,
-                    eth_dst=('33:33:00:00:00:00',
-                             'ff:ff:00:00:00:00')))
         elif datapath.ports[in_port].is_untagged():
             # send rule for each untagged port
             push_act = [
@@ -348,23 +334,11 @@ class Valve(app_manager.RyuApp):
             if tagged_act:
                 action += push_act + tagged_act
 
-            matches.append(parser.OFPMatch(in_port=in_port, eth_src=src,
-                    eth_dst='ff:ff:ff:ff:ff:ff'))
-
+            # match multicast/broadcast
             matches.append(parser.OFPMatch(in_port=in_port,
                     eth_src=src,
                     eth_dst=('01:00:00:00:00:00',
                              '01:00:00:00:00:00')))
-
-            matches.append(parser.OFPMatch(in_port=in_port,
-                    eth_src=src,
-                    eth_dst=('01:00:5E:00:00:00',
-                             'ff:ff:ff:00:00:00')))
-
-            matches.append(parser.OFPMatch(in_port=in_port,
-                    eth_src=src,
-                    eth_dst=('33:33:00:00:00:00',
-                             'ff:ff:00:00:00:00')))
 
         # install broadcast/multicast rules onto datapath
         if datapath.config_default['smart_broadcast']:
